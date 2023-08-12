@@ -715,12 +715,11 @@ pub const Fetch = struct {
             // const globalThis = this.global_this;
             if (this.aborted.load(.Acquire) or this.http == null) return;
 
-
             const success = this.result.isSuccess();
-            const globalThis = this.global_this;      
-                    
+            const globalThis = this.global_this;
+
             defer {
-                if(!success or !this.result.has_more) {       
+                if (!success or !this.result.has_more) {
                     var vm = globalThis.bunVM();
                     this.poll_ref.unref(vm);
                     this.clearData();
@@ -728,7 +727,7 @@ pub const Fetch = struct {
                 }
             }
 
-            if(!success) {
+            if (!success) {
                 const err = this.onReject();
                 globalThis.throwValue(err);
                 return;
@@ -748,7 +747,7 @@ pub const Fetch = struct {
 
             var poll_ref = this.poll_ref;
             var vm = globalThis.bunVM();
-            
+
             if (promise_value.isEmptyOrUndefinedOrNull()) {
                 poll_ref.unref(vm);
                 this.clearData();
@@ -772,7 +771,6 @@ pub const Fetch = struct {
                 false => this.onReject(),
             };
             result.ensureStillAlive();
-
 
             promise_value.ensureStillAlive();
 
