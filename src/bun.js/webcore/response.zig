@@ -744,6 +744,7 @@ pub const Fetch = struct {
                 if (body.value == .Locked) {
                     if (body.value.Locked.readable) |readable| {
                         if (readable.ptr == .Bytes) {
+                            this.response.?.body.value.Locked.readable.?.ptr.Bytes.size_hint = @as(u52, @intCast(this.body_size));
                             var scheduled_response_buffer = this.scheduled_response_buffer.list;
 
                             const chunk = scheduled_response_buffer.items;
@@ -769,6 +770,8 @@ pub const Fetch = struct {
 
                             return;
                         }
+                    } else {
+                        this.response.?.body.value.Locked.size_hint = @as(u52, @intCast(this.body_size));
                     }
                     // we will reach here when not streaming
                     if (!this.result.has_more) {
@@ -776,13 +779,23 @@ pub const Fetch = struct {
 
                         // done resolve body
                         var old = body.value;
-                        response.body.value = Body.Value{
+                        var body_value = Body.Value{
                             .InternalBlob = .{
                                 .bytes = scheduled_response_buffer.toManaged(bun.default_allocator),
                             },
                         };
+                        this.response.?.body.value = body_value;
+
+                        this.scheduled_response_buffer = .{
+                            .allocator = bun.default_allocator,
+                            .list = .{
+                                .items = &.{},
+                                .capacity = 0,
+                            },
+                        };
+
                         if (old == .Locked) {
-                            old.resolve(&response.body.value, this.global_this);
+                            old.resolve(&this.response.?.body.value, this.global_this);
                         }
                     }
                 }
@@ -945,7 +958,6 @@ pub const Fetch = struct {
         fn toResponse(this: *FetchTasklet, allocator: std.mem.Allocator) Response {
             const http_response = this.result.response;
             this.is_waiting_body = this.result.has_more;
-            this.body_size = this.result.body_size;
             return Response{
                 .allocator = allocator,
                 .url = bun.String.createAtomIfPossible(this.result.href),
@@ -1118,6 +1130,7 @@ pub const Fetch = struct {
             task.mutex.lock();
             defer task.mutex.unlock();
             task.result = result;
+            task.body_size = result.body_size;
 
             const success = result.isSuccess();
             task.response_buffer = result.body.?.*;
@@ -1133,6 +1146,7 @@ pub const Fetch = struct {
             }
             // reset for reuse
             task.response_buffer.reset();
+            HTTPClient.http_thread.wakeup();
         }
     };
 
